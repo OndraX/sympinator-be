@@ -175,6 +175,7 @@ func mustacheHandler(dirname string) http.HandlerFunc {
 		Success bool
 		Message string
 	}
+
 	func loginHandler() http.HandlerFunc {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.Method {
@@ -370,7 +371,7 @@ func mustacheHandler(dirname string) http.HandlerFunc {
 	}
 	//  }}}
 
-	// {{{ FUTURE ENDPOINT /api/users
+	// {{{ ENDPOINT /api/users
 	// requires authentication,
 	func handleUsers() http.HandlerFunc {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -406,7 +407,7 @@ func mustacheHandler(dirname string) http.HandlerFunc {
 		})
 	}
 	// }}}
-	//{{{ FUTURE ENDPOINT /api/hierarchy
+	//{{{ ENDPOINT /api/hierarchy
 
 	//{{{ ENDPOINT api/hierarchy/mine
 	func hierarchyByUser() http.HandlerFunc {
@@ -552,6 +553,126 @@ func mustacheHandler(dirname string) http.HandlerFunc {
 	 }
 //	  }}}
 
+	// {{{ Writeup of database model requirements
+	// GET USER PERMISSIONS: from groups where user id = user id, concatenate all permission IDs
+	// GET USER HIERARCHY STATUS
+	// GET [LECTURE|SUGGESTION] CREATOR -- so that you can edit your own suggestions
+	// => ADD creator field (ref to user) to model
+	// MAKE UNIQUE IDs FOR LECTURES
+	// }}}
+	func toApp(w http.ResponseWriter, r *http.Request){
+		http.Redirect(w, r, "/app", 301)
+	}
+	//{{{ STUB ENDPOINT /api/is-authenticated
+	func serveSuccess(message string) http.HandlerFunc {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if(r.Method == "GET"){
+				log.Println("r.Header['header']");
+				log.Println(r.Header);
+				// response := AuthResponse{true,"token valid"}
+				// utils.WriteJSONResponse(w,response,200) // TODO: look up non-arbitrary server error numbers
+			} else {
+				http.Error(w,"Only GET with header allowed for this stub endpoint.",405);
+			}
+			// this should do nothing -- userlist is a singleton -- error out
+			// uses POST to write, GET to read
+		})
+	}
+
+	//  }}}
+
+	func main() {
+		// ROUTING {{{
+		// TODO: maybe this all schould be accessible under /api/endpoint and root should serve the app (or login if not logged in)
+		// uncomment these as soon as we've got a meaningful basis to assign tokens on
+		// http.HandleFunc("/", JWTAuthMiddleware(rootHandler()))
+		// http.HandleFunc("/login", JWTAuthMiddleware(loginHandler()))
+		// http.HandleFunc("/make_user", JWTAuthMiddleware(userMakeHandler()))
+		http.HandleFunc("/login", loginHandler()) // TODO: handle corresponding html using template
+		http.HandleFunc("/api/login", loginHandler())
+		http.HandleFunc("/api/timetable/", handleTimetable())
+		http.HandleFunc("/api/lectures/", handleLectures())
+		http.HandleFunc("/api/users/", usersHandler())
+		http.HandleFunc("/api/groups/", groupsHandler())
+		http.HandleFunc("/api/hierarchy/higher", hierarchyHandler(1))
+		http.HandleFunc("/api/hierarchy/lower", hierarchyHandler(-1))
+		http.HandleFunc("/api/hierarchy/mine/", hierarchyByUser())
+		http.HandleFunc("/api/permissions/user/", handleUserPermissions())
+		http.HandleFunc("/api/permissions/group/", handleGroupPermissions())
+		http.HandleFunc("/api/lecture_suggestions", handleSuggestion())
+		// // http.HandleFunc("/app/*", appHandler()) // all urls except those in dist get routed to index.html
+		// // http.HandleFunc("/app/dist/*", appDistHandler())
+		// // http.HandleFunc("/web/*", mustacheTestHandler()) // all urls except those in dist get routed to index.html
+		// http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
+		http.HandleFunc("/mustache/", mustacheHandler("/mustache/"))
+		// // http.HandleFunc("/api/is-authenticated",JWTAuthMiddleware(serveSuccess("token valid")));
+		// http.HandleFunc("/api/is-authenticated",serveSuccess("token valid"));
+		// // http.HandleFunc("/api/hierarchy/lower",JWTAuthMiddleware(serveSuccess("token valid")));
+		// // http.HandleFunc("/api/hierarchy/higher",JWTAuthMiddleware(serveSuccess("token valid")));
+		// http.HandleFunc("/api/hierarchy/lower",handleHierarchy(1))
+		// http.HandleFunc("/api/hierarchy/higher",handleHierarchy(-1))
+		// http.HandleFunc("/api/hierarchy",handleHierarchy(0))
+		http.HandleFunc("/app/",appHandler());
+		http.Handle("/app/dist/",http.StripPrefix("/app/dist/", http.FileServer(http.Dir("./frontend/dist"))));
+		// http.HandleFunc("/", toApp) // TEMPORARY
+		// In practice, the app would run on a subdomain (hopefully HTACCESS or DNS can do this somehow), / would be served from /web/, /api would be served from ???
+		// http.HandleFunc("/app/dist/*", appDistHandler())
+		// ROUTING }}}
+		v := reflect.ValueOf(http.DefaultServeMux).Elem()
+		fmt.Printf("routes: %v\n", v.FieldByName("m"))
+		// TODO: get default 404 handling, not ugly error messages
+		log.Println("listening on 8000")
+
+		log.Fatal(http.ListenAndServeTLS(":8000","./localhost/cert.pem","./localhost/key.pem", nil))
+	}
+
+	// {{{ FUTURE ENDPOINT /api/meta_schedule
+	func scheduleHandler() http.HandlerFunc {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.Method {
+				// ALWAYS expects: "is_editing": "org[anisation]|ev[en]t"
+				// 	this parameter tells us whether we
+			case "GET":
+				// gets days and timeslots along with associated ids, also gets phases of project -- when what can be submitted
+			case "POST":
+				// noop
+			case "DELETE":
+				// delete a day
+			case "PATCH":
+				// alter a day
+			case "PUT":
+				// create a day
+			default:
+			}
+
+		})
+	}
+	//  }}}
+	// {{{ FUTURE ENDPOINT /api/paradigm
+	func paradigmHandler() http.HandlerFunc {
+		// working with days, classes, 
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.Method {
+				// ALWAYS expects: "is_editing": "org[anisation]|ev[en]t"
+				// 	this parameter tells us whether we
+			case "GET":
+				// gets days and timeslots along with associated ids, also gets phases of project -- when what can be submitted
+			case "POST":
+				// noop
+			case "DELETE":
+				// delete a day and all references to lectures within it
+				// expects id
+				// requires ALTER_PARADIGM
+			case "PUT":
+				// create a day or replace existing day if request contains day id
+				// optional parameter "day_id"
+			default:
+				// noop, throw error
+			}
+
+		})
+	}
+	//  }}}
 	//{{{ FUTURE ENDPOINT /api/lectures
 	// requires authentication
 	func handleLectures() http.HandlerFunc {
@@ -703,121 +824,3 @@ func mustacheHandler(dirname string) http.HandlerFunc {
 	}
 	//  }}}
 
-	// {{{ Writeup of database model requirements
-	// GET USER PERMISSIONS: from groups where user id = user id, concatenate all permission IDs
-	// GET USER HIERARCHY STATUS
-	// GET [LECTURE|SUGGESTION] CREATOR -- so that you can edit your own suggestions
-	// => ADD creator field (ref to user) to model
-	// MAKE UNIQUE IDs FOR LECTURES
-	// }}}
-	func toApp(w http.ResponseWriter, r *http.Request){
-		http.Redirect(w, r, "/app", 301)
-	}
-	//{{{ STUB ENDPOINT /api/is-authenticated
-	func serveSuccess(message string) http.HandlerFunc {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if(r.Method == "GET"){
-				log.Println("r.Header['header']");
-				log.Println(r.Header);
-				// response := AuthResponse{true,"token valid"}
-				// utils.WriteJSONResponse(w,response,200) // TODO: look up non-arbitrary server error numbers
-			} else {
-				http.Error(w,"Only GET with header allowed for this stub endpoint.",405);
-			}
-			// this should do nothing -- userlist is a singleton -- error out
-			// uses POST to write, GET to read
-		})
-	}
-
-	//  }}}
-	func main() {
-		// ROUTING {{{
-		// TODO: maybe this all schould be accessible under /api/endpoint and root should serve the app (or login if not logged in)
-		// uncomment these as soon as we've got a meaningful basis to assign tokens on
-		// http.HandleFunc("/", JWTAuthMiddleware(rootHandler()))
-		// http.HandleFunc("/login", JWTAuthMiddleware(loginHandler()))
-		// http.HandleFunc("/make_user", JWTAuthMiddleware(userMakeHandler()))
-		http.HandleFunc("/login", loginHandler()) // TODO: handle corresponding html using template
-		http.HandleFunc("/api/login", loginHandler())
-		http.HandleFunc("/api/timetable/", handleTimetable())
-		http.HandleFunc("/api/lectures/", handleLectures())
-		http.HandleFunc("/api/users/", usersHandler())
-		http.HandleFunc("/api/groups/", groupsHandler())
-		http.HandleFunc("/api/hierarchy/higher", hierarchyHandler(1))
-		http.HandleFunc("/api/hierarchy/lower", hierarchyHandler(-1))
-		http.HandleFunc("/api/hierarchy/mine/", hierarchyByUser())
-		http.HandleFunc("/api/permissions/user/", handleUserPermissions())
-		http.HandleFunc("/api/permissions/group/", handleGroupPermissions())
-		http.HandleFunc("/api/lecture_suggestions", handleSuggestion())
-		// // http.HandleFunc("/app/*", appHandler()) // all urls except those in dist get routed to index.html
-		// // http.HandleFunc("/app/dist/*", appDistHandler())
-		// // http.HandleFunc("/web/*", mustacheTestHandler()) // all urls except those in dist get routed to index.html
-		// http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
-		http.HandleFunc("/mustache/", mustacheHandler("/mustache/"))
-		// // http.HandleFunc("/api/is-authenticated",JWTAuthMiddleware(serveSuccess("token valid")));
-		// http.HandleFunc("/api/is-authenticated",serveSuccess("token valid"));
-		// // http.HandleFunc("/api/hierarchy/lower",JWTAuthMiddleware(serveSuccess("token valid")));
-		// // http.HandleFunc("/api/hierarchy/higher",JWTAuthMiddleware(serveSuccess("token valid")));
-		// http.HandleFunc("/api/hierarchy/lower",handleHierarchy(1))
-		// http.HandleFunc("/api/hierarchy/higher",handleHierarchy(-1))
-		// http.HandleFunc("/api/hierarchy",handleHierarchy(0))
-		http.HandleFunc("/app/",appHandler());
-		http.Handle("/app/dist/",http.StripPrefix("/app/dist/", http.FileServer(http.Dir("./frontend/dist"))));
-		// http.HandleFunc("/", toApp) // TEMPORARY
-		// In practice, the app would run on a subdomain (hopefully HTACCESS or DNS can do this somehow), / would be served from /web/, /api would be served from ???
-		// http.HandleFunc("/app/dist/*", appDistHandler())
-		// ROUTING }}}
-		v := reflect.ValueOf(http.DefaultServeMux).Elem()
-		fmt.Printf("routes: %v\n", v.FieldByName("m"))
-		// TODO: get default 404 handling, not ugly error messages
-		log.Println("listening on 8000")
-		log.Fatal(http.ListenAndServe(":8000", nil))
-	}
-
-	// {{{ FUTURE ENDPOINT /api/meta_schedule
-	func scheduleHandler() http.HandlerFunc {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			switch r.Method {
-				// ALWAYS expects: "is_editing": "org[anisation]|ev[en]t"
-				// 	this parameter tells us whether we
-			case "GET":
-				// gets days and timeslots along with associated ids, also gets phases of project -- when what can be submitted
-			case "POST":
-				// noop
-			case "DELETE":
-				// delete a day
-			case "PATCH":
-				// alter a day
-			case "PUT":
-				// create a day
-			default:
-			}
-
-		})
-	}
-	//  }}}
-	// {{{ FUTURE ENDPOINT /api/paradigm
-	func paradigmHandler() http.HandlerFunc {
-		// working with days, classes, 
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			switch r.Method {
-				// ALWAYS expects: "is_editing": "org[anisation]|ev[en]t"
-				// 	this parameter tells us whether we
-			case "GET":
-				// gets days and timeslots along with associated ids, also gets phases of project -- when what can be submitted
-			case "POST":
-				// noop
-			case "DELETE":
-				// delete a day and all references to lectures within it
-				// expects id
-				// requires ALTER_PARADIGM
-			case "PUT":
-				// create a day or replace existing day if request contains day id
-				// optional parameter "day_id"
-			default:
-				// noop, throw error
-			}
-
-		})
-	}
-	//  }}}
